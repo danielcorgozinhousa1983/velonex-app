@@ -320,10 +320,41 @@
 
   <div class="section-label">Histórico Diário</div>
   <div class="table-wrap">
-    <div class="table-hdr" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 60px">
-      <span>Data</span><span>Milhas Rod.</span><span>Receita</span><span>Combustível</span><span>Manutenção</span><span>Alimentação</span><span>Diversos</span><span>Resultado</span><span></span>
+    <div class="table-hdr" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 110px">
+      <span>Data</span><span>Milhas Rod.</span><span>Receita</span><span>Combustível</span><span>Manutenção</span><span>Alimentação</span><span>Diversos</span><span>Resultado</span><span>Ações</span>
     </div>
     <div id="diario-table"><div class="empty">Nenhum dia registrado ainda.</div></div>
+  </div>
+</div>
+
+<!-- MODAL DE EDIÇÃO DIÁRIO -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;width:92%;max-width:640px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="font-family:'Orbitron',sans-serif;font-size:14px;color:var(--white)">✏️ Editar Registro Diário</div>
+      <button onclick="closeEditModal()" style="background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:16px">Data: <strong id="edit-data-label" style="color:var(--blue)"></strong></div>
+    <div class="form-grid g4">
+      <div><label>Milhas Inicial</label><input type="number" id="e-km-i" placeholder="Ex: 28000" oninput="calcEditKm()"></div>
+      <div><label>Milhas Final</label><input type="number" id="e-km-f" placeholder="Ex: 28120" oninput="calcEditKm()"></div>
+      <div><label>Milhas Rodadas</label><input type="number" id="e-km-r" placeholder="Auto" readonly style="opacity:.6"></div>
+      <div></div>
+    </div>
+    <div class="form-grid g4">
+      <div><label>Combustível (US$)</label><input type="number" id="e-comb" placeholder="0.00" step="0.01"></div>
+      <div><label>Manutenção (US$)</label><input type="number" id="e-manut" placeholder="0.00" step="0.01"></div>
+      <div><label>Alimentação (US$)</label><input type="number" id="e-alim" placeholder="0.00" step="0.01"></div>
+      <div><label>Diversos (US$)</label><input type="number" id="e-div" placeholder="0.00" step="0.01"></div>
+    </div>
+    <div class="form-grid g2">
+      <div><label>Receita do Dia (US$)</label><input type="number" id="e-rec" placeholder="Total recebido" step="0.01"></div>
+      <div><label>Observações</label><input type="text" id="e-obs" placeholder="Rota, cliente especial..."></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <button class="btn btn-primary" onclick="saveEditDiario()" style="flex:1">✔ Salvar Alterações</button>
+      <button class="btn" onclick="closeEditModal()" style="background:var(--surf);color:var(--muted);border:1px solid var(--border)">Cancelar</button>
+    </div>
   </div>
 </div>
 
@@ -847,7 +878,7 @@ function renderDiario(){
       const totalDesp=(d.comb||0)+(d.manut||0)+(d.alim||0)+(d.div||0);
       const resultado=(d.rec||0)-totalDesp;
       const custoKm=(d.kmr||0)>0?totalDesp/d.kmr:0;
-      return `<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 60px">
+      return `<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 110px">
         <div style="color:var(--muted)">${d.data.split('-').reverse().join('/')}</div>
         <div style="color:var(--blue)">${d.kmr>0?milf(d.kmr):'—'}<div style="font-size:10px;color:var(--dim)">${custoKm>0?brl(custoKm)+'/mi':''}</div></div>
         <div style="color:var(--green);font-weight:700">${brl(d.rec)}</div>
@@ -856,7 +887,10 @@ function renderDiario(){
         <div style="color:var(--red)">${d.alim>0?brl(d.alim):'—'}</div>
         <div style="color:var(--red)">${d.div>0?brl(d.div):'—'}</div>
         <div style="color:${resultado>=0?'var(--green)':'var(--red)'};font-weight:700">${brl(resultado)}</div>
-        <div><button class="btn btn-sm" style="background:transparent;border:none;color:var(--dim);cursor:pointer;font-size:14px" onclick="deleteDiario('${d.data}')" title="Excluir">🗑</button></div>
+        <div style="display:flex;gap:4px;align-items:center">
+          <button class="btn btn-sm" style="background:rgba(10,132,255,.12);border:1px solid rgba(10,132,255,.25);color:var(--blue);cursor:pointer;font-size:13px;border-radius:6px;padding:5px 8px" onclick="openEditDiario('${d.data}')" title="Editar">✏️</button>
+          <button class="btn btn-sm" style="background:transparent;border:none;color:var(--dim);cursor:pointer;font-size:14px" onclick="deleteDiario('${d.data}')" title="Excluir">🗑</button>
+        </div>
       </div>`;}).join('');
 }
 
@@ -1044,6 +1078,81 @@ function renderRelatorio(){
         <div style="color:${r.lucro>=0?'var(--green)':'var(--red)'};font-weight:700">${brl(r.lucro)}</div>
       </div>`).join('');
 }
+
+
+// ── EDIÇÃO DIÁRIO ─────────────────────────────────────
+let editingData = null;
+
+window.calcEditKm = function(){
+  const i = parseFloat(document.getElementById('e-km-i').value)||0;
+  const f = parseFloat(document.getElementById('e-km-f').value)||0;
+  document.getElementById('e-km-r').value = f>i ? (f-i).toFixed(1) : '';
+};
+
+window.openEditDiario = function(data){
+  const d = diarios.find(x=>x.data===data);
+  if(!d) return;
+  editingData = data;
+  document.getElementById('edit-data-label').textContent = data.split('-').reverse().join('/');
+  document.getElementById('e-km-i').value  = d.kmi  || '';
+  document.getElementById('e-km-f').value  = d.kmf  || '';
+  document.getElementById('e-km-r').value  = d.kmr  || '';
+  document.getElementById('e-comb').value  = d.comb || '';
+  document.getElementById('e-manut').value = d.manut|| '';
+  document.getElementById('e-alim').value  = d.alim || '';
+  document.getElementById('e-div').value   = d.div  || '';
+  document.getElementById('e-rec').value   = d.rec  || '';
+  document.getElementById('e-obs').value   = d.obs  || '';
+  const modal = document.getElementById('edit-modal');
+  modal.style.display = 'flex';
+};
+
+window.closeEditModal = function(){
+  document.getElementById('edit-modal').style.display = 'none';
+  editingData = null;
+};
+
+window.saveEditDiario = async function(){
+  if(!editingData) return;
+  const kmi  = parseFloat(document.getElementById('e-km-i').value)||0;
+  const kmf_ = parseFloat(document.getElementById('e-km-f').value)||0;
+  const kmr  = parseFloat(document.getElementById('e-km-r').value)||0;
+  const comb = parseFloat(document.getElementById('e-comb').value)||0;
+  const manut= parseFloat(document.getElementById('e-manut').value)||0;
+  const alim = parseFloat(document.getElementById('e-alim').value)||0;
+  const div  = parseFloat(document.getElementById('e-div').value)||0;
+  const rec  = parseFloat(document.getElementById('e-rec').value)||0;
+  const obs  = document.getElementById('e-obs').value.trim();
+
+  // Salva o diário atualizado
+  await saveDiario({data:editingData, kmi, kmf:kmf_, kmr, comb, manut, alim, div, rec, obs});
+
+  // Remove lançamentos automáticos antigos do dia
+  const autoAntigos = lancamentos.filter(l=>l.data===editingData && l.auto);
+  for(const l of autoAntigos) await deleteDoc(doc(db,'lancamentos',String(l.id)));
+
+  // Recria lançamentos automáticos com valores atualizados
+  const entries = [
+    {cat:'Receita',   tipo:'Receita', valor:rec,  desc:'Receita do dia'},
+    {cat:'Combustível',tipo:'Despesa',valor:comb, desc:'Combustível'},
+    {cat:'Manutenção', tipo:'Despesa',valor:manut,desc:'Manutenção'},
+    {cat:'Alimentação',tipo:'Despesa',valor:alim, desc:'Alimentação'},
+    {cat:'Diversos',   tipo:'Despesa',valor:div,  desc:'Diversos'},
+  ];
+  for(const e of entries){
+    if(e.valor>0){
+      const id = String(Date.now()+Math.random());
+      await saveLanc({id, data:editingData, desc:e.desc, tipo:e.tipo, cat:e.cat, valor:e.valor, auto:true});
+    }
+  }
+
+  closeEditModal();
+};
+
+// Fecha modal clicando fora
+document.getElementById('edit-modal').addEventListener('click', function(e){
+  if(e.target === this) closeEditModal();
+});
 
 // Init
 renderDashboard();
