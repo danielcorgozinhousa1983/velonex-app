@@ -334,12 +334,11 @@
       <div style="font-family:'Orbitron',sans-serif;font-size:14px;color:var(--white)">✏️ Editar Registro Diário</div>
       <button onclick="closeEditModal()" style="background:transparent;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1">✕</button>
     </div>
-    <div style="font-size:11px;color:var(--dim);margin-bottom:16px">Data: <strong id="edit-data-label" style="color:var(--blue)"></strong></div>
     <div class="form-grid g4">
+      <div><label>Data</label><input type="date" id="e-data"></div>
       <div><label>Milhas Inicial</label><input type="number" id="e-km-i" placeholder="Ex: 28000" oninput="calcEditKm()"></div>
       <div><label>Milhas Final</label><input type="number" id="e-km-f" placeholder="Ex: 28120" oninput="calcEditKm()"></div>
       <div><label>Milhas Rodadas</label><input type="number" id="e-km-r" placeholder="Auto" readonly style="opacity:.6"></div>
-      <div></div>
     </div>
     <div class="form-grid g4">
       <div><label>Combustível (US$)</label><input type="number" id="e-comb" placeholder="0.00" step="0.01"></div>
@@ -1093,7 +1092,7 @@ window.openEditDiario = function(data){
   const d = diarios.find(x=>x.data===data);
   if(!d) return;
   editingData = data;
-  document.getElementById('edit-data-label').textContent = data.split('-').reverse().join('/');
+  document.getElementById('e-data').value = data;
   document.getElementById('e-km-i').value  = d.kmi  || '';
   document.getElementById('e-km-f').value  = d.kmf  || '';
   document.getElementById('e-km-r').value  = d.kmr  || '';
@@ -1114,6 +1113,8 @@ window.closeEditModal = function(){
 
 window.saveEditDiario = async function(){
   if(!editingData) return;
+  const novaData = document.getElementById('e-data').value;
+  if(!novaData){ alert('Informe a data.'); return; }
   const kmi  = parseFloat(document.getElementById('e-km-i').value)||0;
   const kmf_ = parseFloat(document.getElementById('e-km-f').value)||0;
   const kmr  = parseFloat(document.getElementById('e-km-r').value)||0;
@@ -1123,15 +1124,29 @@ window.saveEditDiario = async function(){
   const div  = parseFloat(document.getElementById('e-div').value)||0;
   const rec  = parseFloat(document.getElementById('e-rec').value)||0;
   const obs  = document.getElementById('e-obs').value.trim();
+  const dataMudou = novaData !== editingData;
 
-  // Salva o diário atualizado
-  await saveDiario({data:editingData, kmi, kmf:kmf_, kmr, comb, manut, alim, div, rec, obs});
+  // Se mudou a data, verifica se já existe outro registro nessa nova data
+  if(dataMudou){
+    const conflito = diarios.find(x=>x.data===novaData);
+    if(conflito){
+      if(!confirm('Já existe um registro para '+novaData.split('-').reverse().join('/')+'. Deseja substituí-lo pelos dados deste dia?')) return;
+    }
+  }
 
-  // Remove lançamentos automáticos antigos do dia
+  // Salva o diário (na nova data, se mudou)
+  await saveDiario({data:novaData, kmi, kmf:kmf_, kmr, comb, manut, alim, div, rec, obs});
+
+  // Se a data mudou, remove o registro antigo do diário
+  if(dataMudou){
+    await deleteDoc(doc(db, 'diarios', editingData));
+  }
+
+  // Remove lançamentos automáticos antigos (da data original)
   const autoAntigos = lancamentos.filter(l=>l.data===editingData && l.auto);
   for(const l of autoAntigos) await deleteDoc(doc(db,'lancamentos',String(l.id)));
 
-  // Recria lançamentos automáticos com valores atualizados
+  // Recria lançamentos automáticos com valores atualizados, na nova data
   const entries = [
     {cat:'Receita',   tipo:'Receita', valor:rec,  desc:'Receita do dia'},
     {cat:'Combustível',tipo:'Despesa',valor:comb, desc:'Combustível'},
@@ -1142,7 +1157,7 @@ window.saveEditDiario = async function(){
   for(const e of entries){
     if(e.valor>0){
       const id = String(Date.now()+Math.random());
-      await saveLanc({id, data:editingData, desc:e.desc, tipo:e.tipo, cat:e.cat, valor:e.valor, auto:true});
+      await saveLanc({id, data:novaData, desc:e.desc, tipo:e.tipo, cat:e.cat, valor:e.valor, auto:true});
     }
   }
 
